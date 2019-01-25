@@ -2,7 +2,7 @@
 """
     Scalp! Apache log based attack analyzer
     by Romain Gaucher <r@rgaucher.info> - http://rgaucher.info
-                                          http://code.google.com/p/apache-scalp
+                                          https://github.com/neuroo/apache-scalp
 
 
     Copyright (c) 2008 Romain Gaucher <r@rgaucher.info>
@@ -275,7 +275,7 @@ def scalper(access, filters, preferences = [], output = "text"):
         return
     if not os.path.isfile(filters):
         print "error: the filters file (XML) doesn't exist"
-        print "please download it at https://svn.php-ids.org/svn/trunk/lib/IDS/default_filter.xml"
+        print "please download it at https://raw.githubusercontent.com/PHPIDS/PHPIDS/master/lib/IDS/default_filter.xml"
         return
     if output not in ('html', 'text', 'xml'):
         print "error: the output format '%s' hasn't been recognized" % output

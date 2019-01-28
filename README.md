@@ -4,10 +4,12 @@ Scalp! is a log analyzer for the Apache web server that aims to look for securit
 ## How it works
 Scalp is basically using the regular expression from the [PHP-IDS](https://github.com/PHPIDS/PHPIDS) project and matches the lines from the Apache access log file. These regexp has been chosen because of their quality and the top activity of the team maintaining that project.
 
-You will then need this file [default_filter.xml](https://raw.github.com/PHPIDS/PHPIDS/master/lib/IDS/default_filter.xml) in order to run Scalp.
+You will then need this file [default_filter.xml](https://raw.github.com/PHPIDS/PHPIDS/master/lib/IDS/default_filter.xml) or let Scalp! download it for you.
 
-## Usage
+### How to use
 Scalp has a couple of options that may be useful in order to save time when scalping a huge log file or in order to perform a full examination; the default options are almost okay for log files of hundreds of MB.
+
+Edit the config file under scalp/config.py.example with your email server data and save as example/config.py
 
 Current options:
 
@@ -26,7 +28,7 @@ Example of utilization:
 ## Help
 
 ```
-rgaucher@plop:~/work/scalp/branches$ ./scalp.py --help
+./scalp.py --help
 Scalp the apache log! by Romain Gaucher - http://rgaucher.info
 usage:  ./scalp.py [--log|-l log_file] [--filters|-f filter_file] 
                    [--period time-frame] [OPTIONS] [--attack a1,a2,..,an]
@@ -42,6 +44,7 @@ usage:  ./scalp.py [--log|-l log_file] [--filters|-f filter_file]
                      ex: 04/Apr/2008:15:45;*/Mai/2008
                      if not specified at the end, the max or min are taken
    --html      |-h:  generate an HTML output
+   --email     |-m:  generate HTML output and send via email
    --xml       |-x:  generate an XML output
    --text      |-t:  generate a simple text output (default)
    --except    |-c:  generate a file that contains the non examined logs due to the
@@ -50,6 +53,12 @@ usage:  ./scalp.py [--log|-l log_file] [--filters|-f filter_file]
                      list: xss, sqli, csrf, dos, dt, spam, id, ref, lfi
                      the list of attacks should not contains spaces and comma separated
                      ex: xss,sqli,lfi,ref
+   --ignore-ip|-i:   specify the list of IP Addresses to look exclude")
+                     the list of IP Addresses should be comma separated and not contain spaces")
+                     This option can be used in conjunction with --ignore-ip")
+   --ignore-subnet|-n:  specify the list of Subnets to look exclude")
+                     the list of Subnets should be comma separated and not contain spaces")
+                     This option can be used in conjunction with --ignore-subnet")
    --output    |-o:  specifying the output directory; by default, scalp will try to write
                      in the same directory as the log file
    --sample    |-s:  use a random sample of the lines, the number (float in [0,100]) is
@@ -62,3 +71,7 @@ Beside the speed of this software, a couple of points are important:
 - output in many formats (TEXT, XML, HTML)
 - options in order to let the user do a pre-selection (mainly with a range of dates)
 - configuration of the format of the Apache log may come later...
+
+Run or setup the following as a cron task:
+
+    python ./scalp.py -l /var/log/httpd_log -f ./default_filter.xml -o ./scalp-output --email

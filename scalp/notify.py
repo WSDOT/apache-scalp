@@ -33,7 +33,7 @@ def send_email(email_config=None, file=None):
     msg['From'] = from_address
     msg['To'] = ','.join(recipients)
     msg['Date'] = todays_date
-    msg['Subject'] = 'Apache Scalp Error Logs {}'.format(todays_date)
+    msg['Subject'] = 'Apache Scalp Access Logs {}'.format(todays_date)
 
     msg.attach(MIMEText("Today's Apache logs are attached as HTML.", 'plain'))
 
@@ -43,14 +43,6 @@ def send_email(email_config=None, file=None):
             msg.attach(MIMEText(bytes.decode(html.read()), 'html'))
     except Exception as e:
         print ('Unable to attach HTML file to email message. %s' % str(e))
-        return False
-
-    # Start smtp authentication
-    try:
-        smtp.starttls()
-        smtp.login(username, password)
-    except Exception as e:
-        print ('Cannot authenticate with username and password. %s' % str(e))
         return False
 
     # Send

@@ -1,40 +1,49 @@
 #!/usr/bin/env python
-"""
-    Scalp! Apache log based attack analyzer
-    by Romain Gaucher <r@rgaucher.info> - http://rgaucher.info
-                                          https://github.com/neuroo/apache-scalp
-
-
-    Copyright (c) 2008 Romain Gaucher <r@rgaucher.info>
-
-    Licensed under the Apache License, Version 2.0 (the "License");
-    you may not use this file except in compliance with the License.
-    You may obtain a copy of the License at
-
-        http://www.apache.org/licenses/LICENSE-2.0
-
-    Unless required by applicable law or agreed to in writing, software
-    distributed under the License is distributed on an "AS IS" BASIS,
-    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-    See the License for the specific language governing permissions and
-    limitations under the License.
-
-    EXTERNAL DEVELOPER NOTES:
-        10052008: Don C. Weber
-            Fixed XML header by putting comment after XML version line.
-                - This was necessary so that Firefox recognized the file as XML and
-                displayed it properly.  Proper display allows for sections to be
-                collapsed for easy viewing.
-        10062008: Don C. Weber
-            Added Regexp to the XML output.  Also added this to the DTD
-        12312008: Don C. Weber
-            Added IP and Subnet exclusion capability to cmd line input and scalper function
 
 """
-from __future__ import with_statement
+Scalp! Apache log based attack analyzer
+by Romain Gaucher <r@rgaucher.info> - http://rgaucher.info
+                                      https://github.com/neuroo/apache-scalp
+
+Copyright (c) 2008 Romain Gaucher <r@rgaucher.info>
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+
+EXTERNAL DEVELOPER NOTES:
+    10132016: Joshua Wedekind
+        Added email notification option.
+    10052008: Don C. Weber
+        Fixed XML header by putting comment after XML version line.
+            - This was necessary so that Firefox recognized the file as XML and
+            displayed it properly.  Proper display allows for sections to be
+            collapsed for easy viewing.
+    10062008: Don C. Weber
+        Added Regexp to the XML output.  Also added this to the DTD
+    12312008: Don C. Weber
+        Added IP and Subnet exclusion capability to cmd line input and scalper function
+
+"""
+from __future__ import with_statement, absolute_import
 import time, base64
-import os,sys,re,random
 from StringIO import StringIO
+import os, sys, random
+
+try:
+    import re
+except ImportError:
+    # For legacy compatibility
+    import regex as re
+
 try:
     from lxml import etree
 except ImportError:
@@ -46,11 +55,26 @@ except ImportError:
         except ImportError:
             print "Cannot find the ElementTree in your python packages"
 
+from notify import send_email
+try:
+    from config import email_config
+except ImportError:
+    print("Cannot import config.py. Create it from config.py.example to " +
+        "send emails.")
+
+try:
+    # Python 2
+    input = raw_input
+except NameError:
+    pass
+
 __application__ = "scalp"
 __version__     = "0.5"
 __release__     = __application__ + '/' + __version__
 __author__      = "Romain Gaucher"
 __credits__      = ["Romain Gaucher", "Don C. Weber"]
+
+PHPIDC_DEFAULT_XML_URL = "https://raw.github.com/PHPIDS/PHPIDS/master/lib/IDS/default_filter.xml"
 
 names = {
     'xss'  : 'Cross-Site Scripting',
@@ -72,14 +96,14 @@ class BreakLoop( Exception ):
 
 txt_header = """
 #
-# File created by Scalp! by Romain Gaucher - http://code.google.com/p/apache-scalp
+# File created by Scalp! by Romain Gaucher - https://github.com/neuroo/apache-scalp
 # Apache log attack analysis tool based on PHP-IDS filters
 #
 """
 
 xml_header = """<?xml version="1.0" encoding="utf-8"?>
 <!--
- File created by Scalp! by Romain Gaucher - http://code.google.com/p/apache-scalp
+ File created by Scalp! by Romain Gaucher - https://github.com/neuroo/apache-scalp
  Apache log attack analysis tool based on PHP-IDS filters
 -->
 """
@@ -274,9 +298,14 @@ def scalper(access, filters, preferences = [], output = "text"):
         print "error: the log file doesn't exist"
         return
     if not os.path.isfile(filters):
-        print "error: the filters file (XML) doesn't exist"
-        print "please download it at https://raw.githubusercontent.com/PHPIDS/PHPIDS/master/lib/IDS/default_filter.xml"
-        return
+        print("error: the filters file (XML) doesn't exist")
+
+        ans = input("Do you want me to download it? [y]/n: ")
+        if ans in ["", "y", "Y"]:
+            import urllib.request
+            urllib.request.urlretrieve(PHPIDC_DEFAULT_XML_URL, filters)
+        else:
+            return
     if output not in ('html', 'text', 'xml'):
         print "error: the output format '%s' hasn't been recognized" % output
         return
@@ -394,14 +423,19 @@ def scalper(access, filters, preferences = [], output = "text"):
 
     short_name = access[access.rfind(os.sep)+1:]
     if n > 0:
-        print "Generating output in %s%s%s_scalp_*" % (preferences['odir'],os.sep,short_name)
+        print("Generating output in %s%s%s_scalp_*" % (preferences['odir'],
+                os.sep,short_name))
         if 'html' in preferences['output']:
-            generate_html_file(flag, short_name, filters, preferences['odir'])
+            html_file = generate_html_file(flag, short_name, filters,
+                    preferences['odir'])
+            if 'email' in preferences['output']:
+                print("Sending email using config.py settings.")
+                send_email(email_config=email_config, file=html_file)
         elif 'text' in preferences['output']:
             generate_text_file(flag, short_name, filters, preferences['odir'])
         elif 'xml' in preferences['output']:
             generate_xml_file(flag, short_name, filters, preferences['odir'])
-
+    
     # generate exceptions
     if len(diff) > 0:
         o_except = open(os.path.abspath(preferences['odir'] + os.sep + "scalp_except.txt"), "w")
@@ -495,16 +529,17 @@ def generate_html_file(flag, access, filters, odir):
                 for e in flag[attack_type][i]:
                     out.write(" <div class='block highlight'>\n")
                     out.write("  Reason: <span class='reason'>%s</span><br />\n" % html_entities(e[2]))
-                    out.write("  <span class='line'><b>Log line:</b>%s</span><br />\n" % html_entities(e[0][5]))
-                    out.write("  <span class='regexp'><b>Matching Regexp:</b>%s</span>\n" % html_entities(e[1]))
+                    out.write("  <span class='line'><b>Log line: </b>%s</span><br />\n" % html_entities(e[3]))
+                    out.write("  <span class='line'><b>Matcing text: </b>%s</span><br />\n" % html_entities(e[0][5]))
+                    out.write("  <span class='regexp'><b>Matching Regexp: </b>%s</span>\n" % html_entities(e[1]))
                     out.write(" </div>\n")
                 out.write("</div>\n")
             out.write("<br />\n")
         out.write(html_footer)
         out.close()
     except IOError:
-        print "Cannot open the file:", fname
-    return
+        print("Cannot open the file:", fname)
+    return fname
 
 months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
 
@@ -562,38 +597,39 @@ def analyze_date(date):
     return {'start' : v_start, 'end' : v_end}
 
 def help():
-    print "Scalp the apache log! by Romain Gaucher - http://rgaucher.info"
-    print "usage:  ./scalp.py [--log|-l log_file] [--filters|-f filter_file] [--period time-frame] [OPTIONS] [--attack a1,a2,..,an]"
-    print "                   [--sample|-s 4.2]"
-    print "   --log       |-l:  the apache log file './access_log' by default"
-    print "   --filters   |-f:  the filter file     './default_filter.xml' by default"
-    print "   --exhaustive|-e:  will report all type of attacks detected and not stop"
-    print "                     at the first found"
-    print "   --tough     |-u:  try to decode the potential attack vectors (may increase"
-    print "                     the examination time)"
-    print "   --period    |-p:  the period must be specified in the same format as in"
-    print "                     the Apache logs using * as wild-card"
-    print "                     ex: 04/Apr/2008:15:45;*/Mai/2008"
-    print "                     if not specified at the end, the max or min are taken"
-    print "   --html      |-h:  generate an HTML output"
-    print "   --xml       |-x:  generate an XML output"
-    print "   --text      |-t:  generate a simple text output (default)"
-    print "   --except    |-c:  generate a file that contains the non examined logs due to the"
-    print "                     main regular expression; ill-formed Apache log etc."
-    print "   --attack    |-a:  specify the list of attacks to look for"
-    print "                     list: xss, sqli, csrf, dos, dt, spam, id, ref, lfi"
-    print "                     the list of attacks should not contains spaces and comma separated"
-    print "                     ex: xss,sqli,lfi,ref"
-    print "   --ignore-ip|-i:  specify the list of IP Addresses to look exclude"
-    print "                     the list of IP Addresses should be comma separated and not contain spaces"
-    print "                     This option can be used in conjunction with --ignore-ip"
-    print "   --ignore-subnet|-n:  specify the list of Subnets to look exclude"
-    print "                     the list of Subnets should be comma separated and not contain spaces"
-    print "                     This option can be used in conjunction with --ignore-subnet"
-    print "   --output    |-o:  specifying the output directory; by default, scalp will try to write"
-    print "                     in the same directory as the log file"
-    print "   --sample    |-s:  use a random sample of the lines, the number (float in [0,100]) is"
-    print "                     the percentage, ex: --sample 0.1 for 1/1000"
+    print("Scalp the apache log! by Romain Gaucher - http://rgaucher.info")
+    print("usage:  ./scalp.py [--log|-l log_file] [--filters|-f filter_file] [--period time-frame] [OPTIONS] [--attack a1,a2,..,an]")
+    print("                   [--sample|-s 4.2]")
+    print("   --log       |-l:  the apache log file './access_log' by default")
+    print("   --filters   |-f:  the filter file     './default_filter.xml' by default")
+    print("   --exhaustive|-e:  will report all type of attacks detected and not stop")
+    print("                     at the first found")
+    print("   --tough     |-u:  try to decode the potential attack vectors (may increase")
+    print("                     the examination time)")
+    print("   --period    |-p:  the period must be specified in the same format as in")
+    print("                     the Apache logs using * as wild-card")
+    print("                     ex: 04/Apr/2008:15:45;*/Mai/2008")
+    print("                     if not specified at the end, the max or min are taken")
+    print("   --html      |-h:  generate an HTML output")
+    print("   --email     |-m:  generate HTML output and send via email")
+    print("   --xml       |-x:  generate an XML output")
+    print("   --text      |-t:  generate a simple text output (default)")
+    print("   --except    |-c:  generate a file that contains the non examined logs due to the")
+    print("                     main regular expression; ill-formed Apache log etc.")
+    print("   --attack    |-a:  specify the list of attacks to look for")
+    print("                     list: xss, sqli, csrf, dos, dt, spam, id, ref, lfi")
+    print("                     the list of attacks should not contains spaces and comma separated")
+    print("                     ex: xss,sqli,lfi,ref")
+    print("   --ignore-ip|-i:   specify the list of IP Addresses to look exclude")
+    print("                     the list of IP Addresses should be comma separated and not contain spaces")
+    print("                     This option can be used in conjunction with --ignore-ip")
+    print("   --ignore-subnet|-n:  specify the list of Subnets to look exclude")
+    print("                     the list of Subnets should be comma separated and not contain spaces")
+    print("                     This option can be used in conjunction with --ignore-subnet")
+    print("   --output    |-o:  specifying the output directory; by default, scalp will try to write")
+    print("                     in the same directory as the log file")
+    print("   --sample    |-s:  use a random sample of the lines, the number (float in [0,100]) is")
+    print("                     the percentage, ex: --sample 0.1 for 1/1000")
 
 def main(argc, argv):
     filters = "default_filter.xml"
@@ -640,6 +676,8 @@ def main(argc, argv):
                     preferences['exhaustive'] = True
                 elif s in ("--html", "-h"):
                     preferences['output'] += ",html"
+                elif s in ("--email", "-m"):
+                    preferences['output'] += ",html,email"
                 elif s in ("--xml", "-x"):
                     preferences['output'] += ",xml"
                 elif s in ("--text", "-t"):
@@ -670,7 +708,8 @@ def main(argc, argv):
                 os.mkdir(preferences['odir'])
         scalper(access, filters, preferences)
 
-if __name__ == "__main__":
+if __name__ == "__main__" and __package__ is None:
+    __package__ = 'scalp'
     main(len(sys.argv), sys.argv)
     """
     import hotshot

@@ -96,14 +96,14 @@ class BreakLoop( Exception ):
 
 txt_header = """
 #
-# File created by Scalp! by Romain Gaucher - http://code.google.com/p/apache-scalp
+# File created by Scalp! by Romain Gaucher - https://github.com/neuroo/apache-scalp
 # Apache log attack analysis tool based on PHP-IDS filters
 #
 """
 
 xml_header = """<?xml version="1.0" encoding="utf-8"?>
 <!--
- File created by Scalp! by Romain Gaucher - http://code.google.com/p/apache-scalp
+ File created by Scalp! by Romain Gaucher - https://github.com/neuroo/apache-scalp
  Apache log attack analysis tool based on PHP-IDS filters
 -->
 """

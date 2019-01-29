@@ -9,7 +9,7 @@ You will then need this file [default_filter.xml](https://raw.github.com/PHPIDS/
 ### How to use
 Scalp has a couple of options that may be useful in order to save time when scalping a huge log file or in order to perform a full examination; the default options are almost okay for log files of hundreds of MB.
 
-Edit the config file under scalp/config.py.example with your email server data and save as example/config.py
+Edit the config file `config.py.example` with your email server data and save as `config.py`
 
 Current options:
 
